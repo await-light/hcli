@@ -1,0 +1,22 @@
+QLabel#logo[position="login"] {
+    font-size: 54px;
+    /* background-color: "red"; */
+    font-weight: bold;
+}
+QLineEdit,QComboBox#login {
+    border: 1px solid gray;
+    border-radius: 2px;
+    padding-left: 3px;
+    padding-right: 3px;
+    /* font-size: 16px; */
+}
+
+QComboBox::drop-down#login {
+    padding-right: 3px;
+    border: none;
+}
+
+QComboBox::down-arrow#login {
+    image: url(./res/downarrow.png);
+    width: 20px;
+}

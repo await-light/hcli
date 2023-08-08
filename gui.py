@@ -79,7 +79,6 @@ class QtHackchatPort(QThread):
             "channel": self.channel
         })
         first_msg = self._recv_data()
-        print(first_msg)
         if first_msg["cmd"] == "onlineSet":  # 成功进入频道
             self._succeed_login()
             pass
@@ -87,9 +86,14 @@ class QtHackchatPort(QThread):
             # 1. 频率限制 [channel=false]
             if not first_msg["channel"]:
                 print("rate limit")
-                self.signals_window["signal_qmessagebox_warning"].emit(("Warning",
-                                                                        "You are joining channels too fast. "
-                                                                        "Wait a moment and try again."))
+                if first_msg["id"] == 21:
+                    self.signals_window["signal_qmessagebox_warning"].emit(("Warning",
+                                                                            "You are joining channels too fast. "
+                                                                            "Wait a moment and try again."))
+                elif first_msg["id"] == 22:
+                    self.signals_window["signal_qmessagebox_warning"].emit(("Warning",
+                                                                            "Nickname must consist of up to 24 letters,"
+                                                                            " numbers, and underscores"))
             # 2. 验证码 [channel=self.channel]
             else:
                 # start *************验证码转图片********************************************************
@@ -246,7 +250,7 @@ class LoginLayout(QGridLayout):
             for i in range(self.count()):
                 current_item = self.itemAt(i).widget()
                 print("[In LoginLayout] %s.destroyed is connected" % str(current_item))
-                current_item.destroyed.connect(lambda: print("[In LoginLayout]A widget is destroyed"))
+                current_item.destroyed.connect(lambda: print("[In LoginLayout] A widget is destroyed"))
         # end ***************信号*************
 
     def _default_setting(self):
@@ -348,8 +352,21 @@ class ChatLayout(QGridLayout):
         super().__init__()
         self.signals_window = signals_window
 
+        self.setup_ui()
+
     def setup_ui(self):
-        pass
+        # start ************* 控件 *************
+        # QScrollArea: 聊天消息
+        scrollarea_chatmsg = QScrollArea()
+        # scrollarea_chatmsg.setStyleSheet("background-color: red;")
+        test = QPushButton()
+        scrollarea_chatmsg.setWidget(test)
+        # end *************** 控件 *************
+
+        # start ************* 添加控件到布局 *************
+        self.addWidget(scrollarea_chatmsg, 0, 0)
+        # end *************** 添加控件到布局 *************
+
 
 
 class Window(QWidget):

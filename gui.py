@@ -4,11 +4,16 @@ import time
 import queue
 
 from PyQt5.Qt import *
-import websocket._exceptions
-from websocket import create_connection
+from websocket import create_connection, WebSocketConnectionClosedException
 
 import hccommon
 from captcha import string2png
+
+DEBUG = {
+    "turn_to_chat_in_any_situation": False,  # 除去网络部分,直接登录
+    "print_all_received_data": True,  # 输出所有接收到的消息
+    "print_if_login_layout_widgets_destroyed": True  # 输出loginlayout中的控件是否被销毁
+}
 
 
 class QtHackchatPort(QThread):
@@ -35,6 +40,16 @@ class QtHackchatPort(QThread):
         self.signals_window = signals_window
         self.signals_loginlayout = signals_loginlayout
 
+    def _succeed_login(self):
+        print("enter the channel successfully")
+        self.signals_window["signal_turn_to_layout_chat"].emit()
+
+    def _recv_data(self):
+        data = json.loads(self.connection.recv())
+        if DEBUG["print_all_received_data"]:
+            print(data)
+        return data
+
     def send_data(self, json_: dict):
         """
         发送数据
@@ -51,6 +66,9 @@ class QtHackchatPort(QThread):
         使用QThread连接,防止程序卡顿
         :return:
         """
+        if DEBUG["turn_to_chat_in_any_situation"]:
+            self._succeed_login()
+            return
         self.connection = create_connection("wss://hack.chat/chat-ws")
         d_nick = self.nick
         if self.password != "":
@@ -60,12 +78,10 @@ class QtHackchatPort(QThread):
             "nick": d_nick,
             "channel": self.channel
         })
-        first_msg = json.loads(self.connection.recv())
+        first_msg = self._recv_data()
         print(first_msg)
         if first_msg["cmd"] == "onlineSet":  # 成功进入频道
-            # for i in reversed(range(self.login_layout.count())):
-            # self.login_layout.itemAt(i).widget().setParent(None)
-            print("enter the channel successfully")
+            self._succeed_login()
             pass
         elif first_msg["cmd"] == "warn":  # 无法进入
             # 1. 频率限制 [channel=false]
@@ -76,9 +92,8 @@ class QtHackchatPort(QThread):
                                                                         "Wait a moment and try again."))
             # 2. 验证码 [channel=self.channel]
             else:
-                print("captcha")
                 # start *************验证码转图片********************************************************
-                captcha_content = json.loads(self.connection.recv())
+                captcha_content = self._recv_data()
                 _es = 1
                 fpa = ".\\res\\temp\\x%d_%d_%s_%s.png" % (_es, time.time(), self.channel, self.nick)
                 string2png(captcha_content["text"], fpa, eachsize=_es)
@@ -87,14 +102,15 @@ class QtHackchatPort(QThread):
                 self.signals_loginlayout["signal_show_captcha"].emit(fpa)
                 try:
                     # 输入验证码后收到的第一条信息
-                    msgaftcap = json.loads(self.connection.recv())
+                    msgaftcap = self._recv_data()
                     if msgaftcap["cmd"] == "onlineSet":
-                        print("enter the channel successfully")
-                except Exception as e:
+                        self._succeed_login()
+                except WebSocketConnectionClosedException as e:
                     # 如果输入了错误的验证码服务器将会断开连接,再接收消息程序会抛出此异常
                     print("wrong captcha", e)
                     self.signals_window["signal_qmessagebox_warning"].emit(("Warning", "You entered the wrong captcha"))
                     self.signals_loginlayout["signal_hide_captcha"].emit()
+
 
 class LoginLayout(QGridLayout):
     # 创建信号
@@ -225,6 +241,14 @@ class LoginLayout(QGridLayout):
         self.addWidget(self.pushbutton_pushcaptcha, row, 1, Qt.AlignRight)
         # end *************** 添加控件到布局 *************
 
+        # start *************信号*************
+        if DEBUG["print_if_login_layout_widgets_destroyed"]:
+            for i in range(self.count()):
+                current_item = self.itemAt(i).widget()
+                print("[In LoginLayout] %s.destroyed is connected" % str(current_item))
+                current_item.destroyed.connect(lambda: print("[In LoginLayout]A widget is destroyed"))
+        # end ***************信号*************
+
     def _default_setting(self):
         """
         布局默认设置
@@ -315,6 +339,7 @@ class LoginLayout(QGridLayout):
             if w.property("captcha"):
                 w.hide()
 
+
 class ChatLayout(QGridLayout):
     def __init__(self, signals_window):
         """
@@ -343,6 +368,7 @@ class Window(QWidget):
         # 连接信号与槽
         self.signal_qmessagebox_warning.connect(self.warning)
         self.signal_turn_to_layout_login.connect(self.turn_to_loginlayout)
+        self.signal_turn_to_layout_chat.connect(self.turn_to_chatlayout)
         # 包含所有信号(通常需要用到QWidget(顶级窗口))
         self._signals = {
             "signal_qmessagebox_warning": self.signal_qmessagebox_warning,
@@ -363,10 +389,7 @@ class Window(QWidget):
         :param a: (弹窗标题,弹窗内容)
         :return:
         """
-        QMessageBox.warning(self,
-                            a[0],
-                            a[1],
-                            QMessageBox.Close)
+        QMessageBox.warning(self, a[0], a[1], QMessageBox.Close)
 
     def resizeEvent(self, evt):
         """
@@ -382,6 +405,11 @@ class Window(QWidget):
         self.setLayout(login_layout)
 
     def turn_to_chatlayout(self):
+        current_layout = self.layout()
+        for i in reversed(range(current_layout.count())):
+            current_layout.itemAt(i).widget().deleteLater()
+        current_layout.deleteLater()
+        # 设置chatlayout为新布局
         chat_layout = ChatLayout(self._signals)
         self.setLayout(chat_layout)
 

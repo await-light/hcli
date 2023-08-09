@@ -4,15 +4,17 @@ import time
 import queue
 
 from PyQt5.Qt import *
-from websocket import create_connection, WebSocketConnectionClosedException
+from websocket import (create_connection,
+                       WebSocket,
+                       WebSocketConnectionClosedException)
 
 import hccommon
 from captcha import string2png
 
 DEBUG = {
-    "turn_to_chat_in_any_situation": False,  # 除去网络部分,直接登录
+    "turn_to_chat_in_any_situation": False,  # 除去网络部分,直接登录(已弃用)
     "print_all_received_data": True,  # 输出所有接收到的消息
-    "print_if_login_layout_widgets_destroyed": True  # 输出loginlayout中的控件是否被销毁
+    "print_if_login_layout_widgets_destroyed": True  # 输出loginlayout(包括loginlayout)中的控件是否被销毁
 }
 
 
@@ -40,11 +42,20 @@ class QtHackchatPort(QThread):
         self.signals_window = signals_window
         self.signals_loginlayout = signals_loginlayout
 
-    def _succeed_login(self):
+    def _succeed_login(self, first_msg):
+        """
+        成功进入聊天室将会调用此函数
+        :param first_msg: 第一条消息(onlineSet)
+        :return:
+        """
         print("enter the channel successfully")
-        self.signals_window["signal_turn_to_layout_chat"].emit()
+        self.signals_window["signal_turn_to_layout_chat"].emit((self.connection, first_msg))
 
     def _recv_data(self):
+        """
+        返回收到的消息
+        :return:
+        """
         data = json.loads(self.connection.recv())
         if DEBUG["print_all_received_data"]:
             print(data)
@@ -67,7 +78,6 @@ class QtHackchatPort(QThread):
         :return:
         """
         if DEBUG["turn_to_chat_in_any_situation"]:
-            self._succeed_login()
             return
         self.connection = create_connection("wss://hack.chat/chat-ws")
         d_nick = self.nick
@@ -80,7 +90,7 @@ class QtHackchatPort(QThread):
         })
         first_msg = self._recv_data()
         if first_msg["cmd"] == "onlineSet":  # 成功进入频道
-            self._succeed_login()
+            self._succeed_login(first_msg)
             pass
         elif first_msg["cmd"] == "warn":  # 无法进入
             # 1. 频率限制 [channel=false]
@@ -98,9 +108,9 @@ class QtHackchatPort(QThread):
             else:
                 # start *************验证码转图片********************************************************
                 captcha_content = self._recv_data()
-                _es = 1
-                fpa = ".\\res\\temp\\x%d_%d_%s_%s.png" % (_es, time.time(), self.channel, self.nick)
-                string2png(captcha_content["text"], fpa, eachsize=_es)
+                es = 1
+                fpa = ".\\res\\temp\\x%d_%d_%s_%s.png" % (es, time.time(), self.channel, self.nick)
+                string2png(captcha_content["text"], fpa, eachsize=es)
                 # end ***************验证码转图片********************************************************
                 # 激活添加验证码部分信号
                 self.signals_loginlayout["signal_show_captcha"].emit(fpa)
@@ -108,7 +118,7 @@ class QtHackchatPort(QThread):
                     # 输入验证码后收到的第一条信息
                     msgaftcap = self._recv_data()
                     if msgaftcap["cmd"] == "onlineSet":
-                        self._succeed_login()
+                        self._succeed_login(msgaftcap)
                 except WebSocketConnectionClosedException as e:
                     # 如果输入了错误的验证码服务器将会断开连接,再接收消息程序会抛出此异常
                     print("wrong captcha", e)
@@ -344,29 +354,78 @@ class LoginLayout(QGridLayout):
                 w.hide()
 
 
+class QtDataHandler(QThread):
+    def __init__(self, signals_window, signals_chatlayout, connection, first_msg):
+        """
+        处理来自服务器发送的信息
+        :param signals_window: window的所有信号
+        :param signals_chatlayout: chatlayout的所有信号
+        :param connection: WebSocket连接
+        :param first_msg: 收到的第一条消息(onlineSet)
+        """
+        super().__init__()
+
+        self.signals_window = signals_window
+        self.signals_chatlayout = signals_chatlayout
+        self.connection = connection
+        self.first_msg = first_msg
+
+    def _recv_data(self):
+        """
+        返回收到的消息
+        :return:
+        """
+        data = json.loads(self.connection.recv())
+        if DEBUG["print_all_received_data"]:
+            print(data)
+        return data
+
+    def run(self):
+        self.signals_chatlayout["signal_add_text_to_chat"].emit("online: " + ", ".join(self.first_msg["nicks"]))
+
+        while True:
+            try:
+                message = self._recv_data()
+            except Exception as e:
+                print("[Error In QtDataHandler]", e)
+
+
 class ChatLayout(QGridLayout):
-    def __init__(self, signals_window):
+    signal_add_text_to_chat = pyqtSignal(str)  # 在文本框后追加文本
+
+    def __init__(self, signals_window, connection, first_msg):
         """
         聊天页面
         """
         super().__init__()
         self.signals_window = signals_window
+        self.connection = connection
 
-        self.setup_ui()
+        self._setup_ui()
 
-    def setup_ui(self):
+        # 连接信号与槽
+        self.signal_add_text_to_chat.connect(self.add_text_to_chat)
+        # 包含所有信号
+        self._signals = {
+            "signal_add_text_to_chat": self.signal_add_text_to_chat
+        }
+
+        # 启动数据处理器(处理从客户端收来的信息)
+        self.qdh = QtDataHandler(self.signals_window, self._signals, self.connection, first_msg)
+        self.qdh.start()
+
+    def add_text_to_chat(self, text):
+        self.textedit_chat_message.append(text)
+
+    def _setup_ui(self):
         # start ************* 控件 *************
-        # QScrollArea: 聊天消息
-        scrollarea_chatmsg = QScrollArea()
-        # scrollarea_chatmsg.setStyleSheet("background-color: red;")
-        test = QPushButton()
-        scrollarea_chatmsg.setWidget(test)
+        # QTextEdit: 聊天消息
+        self.textedit_chat_message = QTextEdit()
         # end *************** 控件 *************
 
         # start ************* 添加控件到布局 *************
-        self.addWidget(scrollarea_chatmsg, 0, 0)
+        self.addWidget(self.textedit_chat_message, 0, 0)
         # end *************** 添加控件到布局 *************
-
 
 
 class Window(QWidget):
@@ -377,7 +436,7 @@ class Window(QWidget):
     # 创建信号
     signal_qmessagebox_warning = pyqtSignal(tuple)  # 弹出警告弹窗
     signal_turn_to_layout_login = pyqtSignal()  # 转到登录页面
-    signal_turn_to_layout_chat = pyqtSignal()  # 转到聊天页面
+    signal_turn_to_layout_chat = pyqtSignal(tuple)  # 转到聊天页面, tuple -> (connection: WebSocket, first_msg: dict)
 
     def __init__(self):
         QWidget.__init__(self)
@@ -418,17 +477,34 @@ class Window(QWidget):
         self.label_window_size.setText(text)
 
     def turn_to_loginlayout(self):
+        """
+        转到登陆页面
+        :return:
+        """
         login_layout = LoginLayout(self._signals)
+        if DEBUG["print_if_login_layout_widgets_destroyed"]:
+            login_layout.destroyed.connect(lambda: print("loginlayout is destroyed, "
+                                                         "the current layout is %s" % self.layout()))
         self.setLayout(login_layout)
 
-    def turn_to_chatlayout(self):
+    def turn_to_chatlayout(self, cf):
+        """
+        转到聊天页面
+        :param cf: connection, first_msg
+        connection: 登录时创建好的WebSocket连接
+        first_msg: 收到的第一条信息
+        :return:
+        """
+        connection, first_msg = cf
         current_layout = self.layout()
         for i in reversed(range(current_layout.count())):
             current_layout.itemAt(i).widget().deleteLater()
+        # * #  * #  * #  * #  * #  * #  * #  * #  * #  * #  * #
+        chat_layout = ChatLayout(self._signals, connection, first_msg)
+        # * #  * #  * #  * #  * #  * #  * #  * #  * #  * #  * #
+        # 设置chatlayout为新布局(将setLayout绑定到destroyed的信号上,delete_later不会立刻将布局删除)
+        current_layout.destroyed.connect(lambda: self.setLayout(chat_layout))
         current_layout.deleteLater()
-        # 设置chatlayout为新布局
-        chat_layout = ChatLayout(self._signals)
-        self.setLayout(chat_layout)
 
     def setup_ui(self):
         with open("style.qss", "r") as f:

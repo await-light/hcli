@@ -6,6 +6,9 @@ graph TD
     b[LoginLayout];
     c[ChatLayout];
     d[QtHackchatPort];
-    a --signals_window--> c;
+    e[QtDataHandler];
+    a --signals_window\nws connection\nfirst_msg--> c;
     b --"signals_window\nsignals_loginlayout\nnick\npassword\nchannel"--> d;
     a --signals_window--> b;
+    d --ws connection\nfirst_msg--> a;
+    c --signals_window\nsignals_chatlayout\nws connection--> e;

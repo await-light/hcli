@@ -9,13 +9,19 @@ from websocket import (create_connection,
                        WebSocketConnectionClosedException)
 
 import hccommon
+import debug_special
 from captcha import string2png
 
-DEBUG = {
-    "turn_to_chat_in_any_situation": False,  # 除去网络部分,直接登录(已弃用)
-    "print_all_received_data": True,  # 输出所有接收到的消息
-    "print_if_login_layout_widgets_destroyed": True  # 输出loginlayout(包括loginlayout)中的控件是否被销毁
-}
+
+class DEBUG:
+    de = {
+        "turn_to_chat_in_any_situation": True,  # 除去网络部分,直接登录
+        "print_all_received_data": True,  # 输出所有接收到的消息
+        "print_if_login_layout_widgets_destroyed": True  # 输出loginlayout(包括loginlayout)中的控件是否被销毁
+    }
+    debug_connection = debug_special.DebugWebSocket(
+        [{"cmd": "onlineSet", "nicks": ["test1", "test2", "test3", "test4", "Ikun", "Ikun2", "Ikun3", "Ikun114514"]}]
+    )
 
 
 class QtHackchatPort(QThread):
@@ -57,7 +63,7 @@ class QtHackchatPort(QThread):
         :return:
         """
         data = json.loads(self.connection.recv())
-        if DEBUG["print_all_received_data"]:
+        if DEBUG.de["print_all_received_data"]:
             print(data)
         return data
 
@@ -77,7 +83,10 @@ class QtHackchatPort(QThread):
         使用QThread连接,防止程序卡顿
         :return:
         """
-        if DEBUG["turn_to_chat_in_any_situation"]:
+        if DEBUG.de["turn_to_chat_in_any_situation"]:
+            self.connection = DEBUG.debug_connection
+            first_msg = self.connection.recv()
+            self._succeed_login(first_msg)
             return
         self.connection = create_connection("wss://hack.chat/chat-ws")
         d_nick = self.nick
@@ -256,7 +265,7 @@ class LoginLayout(QGridLayout):
         # end *************** 添加控件到布局 *************
 
         # start *************信号*************
-        if DEBUG["print_if_login_layout_widgets_destroyed"]:
+        if DEBUG.de["print_if_login_layout_widgets_destroyed"]:
             for i in range(self.count()):
                 current_item = self.itemAt(i).widget()
                 print("[In LoginLayout] %s.destroyed is connected" % str(current_item))
@@ -376,16 +385,16 @@ class QtDataHandler(QThread):
         :return:
         """
         data = json.loads(self.connection.recv())
-        if DEBUG["print_all_received_data"]:
+        if DEBUG.de["print_all_received_data"]:
             print(data)
         return data
 
     def run(self):
-        self.signals_chatlayout["signal_add_text_to_chat"].emit("online: " + ", ".join(self.first_msg["nicks"]))
+        self.signals_chatlayout["signal_add_text_to_chat"].emit("online: " + ", ".join(self.first_msg["nicks"]) + "\n")
 
         while True:
             try:
-                message = self._recv_data()
+                message = self._recv_data()  # TODO 处理收到的消息
             except Exception as e:
                 print("[Error In QtDataHandler]", e)
 
@@ -482,7 +491,7 @@ class Window(QWidget):
         :return:
         """
         login_layout = LoginLayout(self._signals)
-        if DEBUG["print_if_login_layout_widgets_destroyed"]:
+        if DEBUG.de["print_if_login_layout_widgets_destroyed"]:
             login_layout.destroyed.connect(lambda: print("loginlayout is destroyed, "
                                                          "the current layout is %s" % self.layout()))
         self.setLayout(login_layout)

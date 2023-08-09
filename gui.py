@@ -116,9 +116,9 @@ class QtHackchatPort(QThread):
                 self.signals_loginlayout["signal_show_captcha"].emit(fpa)
                 try:
                     # 输入验证码后收到的第一条信息
-                    msgaftcap = self._recv_data()
-                    if msgaftcap["cmd"] == "onlineSet":
-                        self._succeed_login(msgaftcap)
+                    first_msg_aft_captcha = self._recv_data()
+                    if first_msg_aft_captcha["cmd"] == "onlineSet":
+                        self._succeed_login(first_msg_aft_captcha)
                 except WebSocketConnectionClosedException as e:
                     # 如果输入了错误的验证码服务器将会断开连接,再接收消息程序会抛出此异常
                     print("wrong captcha", e)
@@ -191,7 +191,7 @@ class LoginLayout(QGridLayout):
                 self.combox_channel.addItem(QIcon(item[0]), item[1])
         # QPushButton: 确认按钮
         self.pushbutton_enter = QPushButton()
-        self.pushbutton_enter.setProperty("isenterbutton", True)
+        self.pushbutton_enter.setProperty("is_enter_button", True)
         self.pushbutton_enter.setMinimumWidth(120)
         self.pushbutton_enter.setEnabled(False)  # 设置为不可用
         self.pushbutton_enter.setText("->")
@@ -213,17 +213,17 @@ class LoginLayout(QGridLayout):
         self.lineedit_captcha = QLineEdit()
         self.lineedit_captcha.setVisible(False)
         self.lineedit_captcha.setProperty("captcha", True)
-        self.lineedit_captcha.setProperty("isentercaptcha", True)
+        self.lineedit_captcha.setProperty("is_enter_captcha", True)
         self.lineedit_captcha.setMaximumWidth(177)
         self.lineedit_captcha.textChanged.connect(self._check_captcha_empty)
         # QPushButton: 验证码确认按钮
-        self.pushbutton_pushcaptcha = QPushButton()
-        self.pushbutton_pushcaptcha.setVisible(False)
-        self.pushbutton_pushcaptcha.setProperty("captcha", True)
-        self.pushbutton_pushcaptcha.setMinimumWidth(120)
-        self.pushbutton_pushcaptcha.setEnabled(False)
-        self.pushbutton_pushcaptcha.setText("->")
-        self.pushbutton_pushcaptcha.clicked.connect(self._push_captcha_input)
+        self.pushbutton_push_captcha = QPushButton()
+        self.pushbutton_push_captcha.setVisible(False)
+        self.pushbutton_push_captcha.setProperty("captcha", True)
+        self.pushbutton_push_captcha.setMinimumWidth(120)
+        self.pushbutton_push_captcha.setEnabled(False)
+        self.pushbutton_push_captcha.setText("->")
+        self.pushbutton_push_captcha.clicked.connect(self._push_captcha_input)
         # end *************** 控件 *************
 
         # start ************* 添加控件到布局 *************
@@ -252,7 +252,7 @@ class LoginLayout(QGridLayout):
         # 第七行
         row = 6
         self.addWidget(self.lineedit_captcha, row, 0, 1, 2, Qt.AlignLeft)
-        self.addWidget(self.pushbutton_pushcaptcha, row, 1, Qt.AlignRight)
+        self.addWidget(self.pushbutton_push_captcha, row, 1, Qt.AlignRight)
         # end *************** 添加控件到布局 *************
 
         # start *************信号*************
@@ -318,9 +318,9 @@ class LoginLayout(QGridLayout):
         """
         captcha = self.lineedit_captcha.text()
         if captcha.strip() != "":
-            self.pushbutton_pushcaptcha.setEnabled(True)
+            self.pushbutton_push_captcha.setEnabled(True)
         else:
-            self.pushbutton_pushcaptcha.setEnabled(False)
+            self.pushbutton_push_captcha.setEnabled(False)
 
     def _show_captcha(self, filepath):
         """
@@ -332,7 +332,7 @@ class LoginLayout(QGridLayout):
         # 将所有captcha部件设为可见
         for i in reversed(range(self.count())):
             w = self.itemAt(i).widget()
-            if w.property("isenterbutton"):
+            if w.property("is_enter_button"):
                 w.setText("Re-Enter")
             if w.property("isimage"):
                 w.setPixmap(QPixmap(filepath))
@@ -345,10 +345,10 @@ class LoginLayout(QGridLayout):
         for i in reversed(range(self.count())):
             w = self.itemAt(i).widget()
             # 将按钮文本设置为默认
-            if w.property("isenterbutton"):
+            if w.property("is_enter_button"):
                 w.setText("->")
             # 清空验证码输入框文本
-            if w.property("isentercaptcha"):
+            if w.property("is_enter_captcha"):
                 w.setText("")
             if w.property("captcha"):
                 w.hide()

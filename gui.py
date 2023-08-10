@@ -1,11 +1,11 @@
-# TODO 外部 在发送消息之后将视角移动到最下
-# TODO 外部 粗糙 完善消息渲染
+# TODO 外部 区分普通文本和富文本
+# TODO 外部 转义字符无法转义
+# TODO 外部 完善消息类别判定
+# TODO 外部 设置显示消息文本框内容不可编辑
+# TODO 内部 将一些常量添加到common.py
 # TODO 外部 添加不同颜色主题(包括字体选择,字体粗细,字体大小)
 # TODO 外部 支持markdown
-# TODO 外部 分辨普通文本和富文本
-# TODO 外部 设置显示消息文本框内容不可编辑
 # TODO 外部 添加设置页面入口
-# TODO 内部 将一些常量添加到common.py
 
 
 import sys
@@ -602,6 +602,9 @@ class ChatLayout(QGridLayout):
             "cmd": "chat",
             "text": text
         }))
+        self.textedit_chat_message.moveCursor(
+            self.textedit_send_message.textCursor().End
+        )
 
     def add_text_to_chat(self, text):
         """

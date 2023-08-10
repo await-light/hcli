@@ -1,8 +1,12 @@
+# TODO 外部 在发送消息之后将视角移动到最下
 # TODO 外部 粗糙 完善消息渲染
 # TODO 外部 添加不同颜色主题(包括字体选择,字体粗细,字体大小)
 # TODO 外部 支持markdown
 # TODO 外部 分辨普通文本和富文本
+# TODO 外部 设置显示消息文本框内容不可编辑
+# TODO 外部 添加设置页面入口
 # TODO 内部 将一些常量添加到common.py
+
 
 import sys
 import json
@@ -28,7 +32,7 @@ class DEBUG:
     """
     de = {
         "show_window_size": False,  # 显示窗口大小在左上角
-        "turn_to_chat_in_any_situation": True,  # 除去网络部分,直接登录
+        "turn_to_chat_in_any_situation": False,  # 除去网络部分,直接登录
         "print_all_received_data": True,  # 输出所有接收到的消息
         "print_if_login_layout_widgets_destroyed": True  # 输出loginlayout(包括loginlayout)中的控件是否被销毁
     }
@@ -433,7 +437,7 @@ class QtDataHandler(QThread):
                 final_text += " "
             trip_nick = nick
             if color is not None:
-                trip_nick = font(nick, color=color)
+                trip_nick = Label.font(nick, color="#%s" % color)
             final_text += Label.b(trip_nick)
             final_text += Label.br + text
 

@@ -3,6 +3,7 @@ QLabel#logo[position="login"] {
     /* background-color: "red"; */
     font-weight: bold;
 }
+
 QLineEdit,QComboBox#login {
     border: 1px solid gray;
     border-radius: 2px;
@@ -19,4 +20,12 @@ QComboBox::drop-down#login {
 QComboBox::down-arrow#login {
     image: url(./res/downarrow.png);
     width: 20px;
+}
+
+QTextEdit#chat[tp="show"] {
+    font-size: 18px;
+}
+
+QTextEdit#chat[tp="send"] {
+    font-size: 18px;
 }

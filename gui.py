@@ -1,3 +1,9 @@
+# TODO 外部 粗糙 完善消息渲染
+# TODO 外部 添加不同颜色主题(包括字体选择,字体粗细,字体大小)
+# TODO 外部 支持markdown
+# TODO 外部 分辨普通文本和富文本
+# TODO 内部 将一些常量添加到common.py
+
 import sys
 import json
 import time
@@ -8,20 +14,59 @@ from websocket import (create_connection,
                        WebSocket,
                        WebSocketConnectionClosedException)
 
-import hccommon
+import common
+from common import Label
 import debug_special
 from captcha import string2png
 
 
 class DEBUG:
+    """
+    调试用
+    de: 参数列表
+    debug_connection: 模拟WebSocket连接
+    """
     de = {
+        "show_window_size": False,  # 显示窗口大小在左上角
         "turn_to_chat_in_any_situation": True,  # 除去网络部分,直接登录
         "print_all_received_data": True,  # 输出所有接收到的消息
         "print_if_login_layout_widgets_destroyed": True  # 输出loginlayout(包括loginlayout)中的控件是否被销毁
     }
-    debug_connection = debug_special.DebugWebSocket(
-        [{"cmd": "onlineSet", "nicks": ["test1", "test2", "test3", "test4", "Ikun", "Ikun2", "Ikun3", "Ikun114514"]}]
-    )
+    debug_connection = debug_special.DebugWebSocket(received_message_list=[
+        {"cmd": "onlineSet", "nicks": ["test1", "test2", "test3", "test4", "Ikun", "Ikun2", "Ikun3", "Ikun114514"]},
+        {'cmd': 'chat', 'nick': 'dfs', 'uType': 'user', 'userid': 5045011596697, 'channel': 'your-channel',
+         'text': 'hello', 'level': 100, 'time': 1691657928760},
+        {'cmd': 'info', 'channel': 'your-channel', 'from': 'await', 'to': 5045011596697,
+         'text': 'await whispered: fuck', 'type': 'whisper', 'trip': 'for9zT', 'level': 100, 'uType': 'user',
+         'time': 1691657935276},
+        {'cmd': 'emote', 'nick': 'await', 'userid': 6195602720136, 'text': '@await hello', 'channel': 'your-channel',
+         'trip': 'for9zT', 'time': 1691657938958},
+        {'cmd': 'chat', 'nick': 'await', 'uType': 'user', 'userid': 6195602720136, 'channel': 'your-channel',
+         'text': 'awa', 'level': 100, 'trip': 'for9zT', 'time': 1691657942873},
+        {'nick': 'await', 'trip': 'for9zT', 'uType': 'user', 'hash': 'gigSTBJd6hXecPZ', 'level': 100,
+         'userid': 6195602720136, 'isBot': False, 'color': 'FF6000', 'cmd': 'updateUser', 'channel': 'your-channel',
+         'time': 1691657953469},
+        {'cmd': 'onlineAdd', 'nick': 'MelonFour__', 'trip': 'Myh1TA', 'uType': 'user', 'hash': 'HeecuxmRpb5kMBI',
+         'level': 100, 'userid': 1607159521911, 'isBot': False, 'color': False, 'channel': 'your-channel',
+         'time': 1691657967855},
+        {'cmd': 'warn',
+         'text': 'You are sending too much text. Wait a moment and try again.\nPr'
+                 'ess the up arrow key to restore your last message.',
+         'channel': 'your-channel', 'time': 1691658045130},
+        {'cmd': 'warn', 'text': 'You are being rate-limited or blocked.', 'channel': 'your-channel',
+         'time': 1691658071093},
+        {'cmd': 'info',
+         'text': "# All commands:\n|Category:|Name:|\n|---:|---|\n|Admin:|addmod, bomb, deletecmd, listusers, reload, r"
+                 "emovemod, saveconfig, shout|\n|Core:|changecolor, changenick, chat, emote, help, invite, join, morest"
+                 "ats, move, ping, session, stats, updateMessage, whisper|\n|Fun:|hax|\n|Internal:|disconnect, socketre"
+                 "ply|\n|Mod:|anticmd, authtrip, ban, controltor, deauthtrip, disablecaptcha, dumb, enablecaptcha, forc"
+                 "ecolor, kick, lockroom, moveuser, overflow, speak, unban, unbanall, unlockroom, uwuify|\n---\nFor spe"
+                 "cific help on certain commands, use either:\nText: `/help <command name>`\nAPI: `{cmd: 'help', comman"
+                 "d: '<command name>'}`",
+         'channel': 'your-channel', 'time': 1691658156880},
+        {'cmd': 'info', 'channel': 'your-channel', 'from': 5045011596697, 'to': 6195602720136,
+         'text': 'You whispered to @await: hello', 'type': 'whisper', 'time': 1691658173163}
+    ])
 
 
 class QtHackchatPort(QThread):
@@ -85,7 +130,7 @@ class QtHackchatPort(QThread):
         """
         if DEBUG.de["turn_to_chat_in_any_situation"]:
             self.connection = DEBUG.debug_connection
-            first_msg = self.connection.recv()
+            first_msg = self._recv_data()
             self._succeed_login(first_msg)
             return
         self.connection = create_connection("wss://hack.chat/chat-ws")
@@ -191,9 +236,9 @@ class LoginLayout(QGridLayout):
         self.combox_channel.setObjectName("login")
         self.combox_channel.setEditable(True)
         self.combox_channel.setMaxVisibleItems(6)
-        self.combox_channel.setMaxCount(len(hccommon.CHANNELS))
+        self.combox_channel.setMaxCount(len(common.CHANNELS))
         self.combox_channel.currentTextChanged.connect(self._check_nick_channel_empty)
-        for i, item in enumerate(hccommon.CHANNELS):
+        for i, item in enumerate(common.CHANNELS):
             if item[0] is None:
                 self.combox_channel.addItem(item[1])
             else:
@@ -364,6 +409,74 @@ class LoginLayout(QGridLayout):
 
 
 class QtDataHandler(QThread):
+    @staticmethod
+    def render_message(message):
+        """
+        将消息根据类别渲染成html
+        :param message: 数据
+        :return: None不显示
+        """
+        final_text = ""
+        cmd = message["cmd"]
+        if cmd == "onlineSet":
+            nicks = message["nicks"]
+            # users = message["users"]]
+            final_text += Label.font("%s Users online: %s" % (Label.b("*"), ", ".join(nicks)), color="#2e541a")
+
+        elif cmd == "chat":  # 聊天消息
+            nick = message["nick"]
+            text = message["text"].replace("\n", "<br>")
+            trip = message.get("trip")
+            color = message.get("color")
+            if trip is not None:
+                final_text += Label.font(trip, color="#6e6b5e")
+                final_text += " "
+            trip_nick = nick
+            if color is not None:
+                trip_nick = font(nick, color=color)
+            final_text += Label.b(trip_nick)
+            final_text += Label.br + text
+
+        elif cmd == "onlineAdd":
+            nick = message["nick"]
+            trip = message.get("trip")
+            final_text += Label.font("%s %s joined" % (Label.b("*"), nick), color="#2e541a")
+
+        elif cmd == "onlineRemove":
+            nick = message["nick"]
+            trip = message.get("trip")
+            final_text += Label.font("%s %s left" % (Label.b("*"), nick), color="#2e541a")
+
+        elif cmd == "warn":
+            text = message["text"].replace("\n", "<br>")
+            final_text += Label.font("%s %s" % (Label.b("!"), text), color="#cfb017")
+
+        elif cmd == "info":
+            tp = message.get("type")
+            if tp is None:
+                text = message["text"].replace("\n", "<br>")
+                final_text += Label.font("%s %s" % (Label.b("*"), text), color="#2e541a")
+            elif tp == "whisper":
+                text = message["text"].replace("\n", "<br>")
+                from_ = message["from"]
+                final_text += Label.b(Label.font("(whisper)", color="#2e541a"))
+                final_text += " "
+                if type(from_) == str:  # 别人发的
+                    trip = message.get("trip")
+                    if trip is not None:  # 有识别码
+                        final_text += Label.font(trip, color="#6e6b5e")
+                else:  # 自己发的
+                    pass
+                final_text += Label.br
+                final_text += text
+            else:
+                return None
+
+        else:
+            return None
+
+        return final_text + Label.br
+
     def __init__(self, signals_window, signals_chatlayout, connection, first_msg):
         """
         处理来自服务器发送的信息
@@ -382,25 +495,63 @@ class QtDataHandler(QThread):
     def _recv_data(self):
         """
         返回收到的消息
-        :return:
+        :return: json转化的dict
         """
-        data = json.loads(self.connection.recv())
+        data = self.connection.recv()
+        if data is not None:
+            data = json.loads(data)
+        else:
+            return None
         if DEBUG.de["print_all_received_data"]:
             print(data)
         return data
 
     def run(self):
-        self.signals_chatlayout["signal_add_text_to_chat"].emit("online: " + ", ".join(self.first_msg["nicks"]) + "\n")
+        self.signals_chatlayout["signal_add_text_to_chat"].emit(QtDataHandler.render_message(self.first_msg))
 
         while True:
             try:
-                message = self._recv_data()  # TODO 处理收到的消息
+                message = self._recv_data()
+                if message is None:
+                    continue
+                rm = QtDataHandler.render_message(message)
+                if rm is None:
+                    continue
+                self.signals_chatlayout["signal_add_text_to_chat"].emit(rm)
             except Exception as e:
                 print("[Error In QtDataHandler]", e)
 
 
+class SendTextEdit(QTextEdit):
+    def __init__(self, signals_window, signals_chatlayout):
+        super().__init__()
+        self.signals_window = signals_window
+        self.signals_chatlayout = signals_chatlayout
+
+    def keyPressEvent(self, evt):
+        """
+        按下键盘事件
+        :param evt:
+        :return:
+        """
+        if evt.modifiers() == Qt.ShiftModifier and evt.key() == Qt.Key_Return:
+            pass
+            # self.signals_chatlayout["signal_add_text_to_send"].emit("\n")
+            # super().keyPressEvent(evt)
+        elif evt.key() == Qt.Key_Return:
+            # shift + enter 换行
+            self.signals_chatlayout["signal_send_message"].emit()
+            super().keyPressEvent(evt)
+            self.setText("")
+            return None
+        super().keyPressEvent(evt)
+        return None
+
+
 class ChatLayout(QGridLayout):
     signal_add_text_to_chat = pyqtSignal(str)  # 在文本框后追加文本
+    signal_send_message = pyqtSignal()
+    signal_add_text_to_send = pyqtSignal(str)  # 向输入框中添加文本
 
     def __init__(self, signals_window, connection, first_msg):
         """
@@ -410,30 +561,68 @@ class ChatLayout(QGridLayout):
         self.signals_window = signals_window
         self.connection = connection
 
-        self._setup_ui()
-
         # 连接信号与槽
         self.signal_add_text_to_chat.connect(self.add_text_to_chat)
+        self.signal_send_message.connect(self.send_message)
+        self.signal_add_text_to_send.connect(self.add_text_to_send)
         # 包含所有信号
         self._signals = {
-            "signal_add_text_to_chat": self.signal_add_text_to_chat
+            "signal_add_text_to_chat": self.signal_add_text_to_chat,
+            "signal_send_message": self.signal_send_message,
+            "signal_add_text_to_send": self.signal_add_text_to_send
         }
+
+        self._setup_ui()
 
         # 启动数据处理器(处理从客户端收来的信息)
         self.qdh = QtDataHandler(self.signals_window, self._signals, self.connection, first_msg)
         self.qdh.start()
 
+    def add_text_to_send(self, text):
+        """
+        向输入框中添加文本
+        :param text: 要添加的文本
+        :return:
+        """
+        self.textedit_send_message.append(text)
+
+    def send_message(self):
+        """
+        获取输入框中的文本并发送
+        :return:
+        """
+        text = self.textedit_send_message.toPlainText().strip()
+        if text == "":  # 禁止发送空白消息
+            return
+        self.connection.send(json.dumps({
+            "cmd": "chat",
+            "text": text
+        }))
+
     def add_text_to_chat(self, text):
+        """
+        添加文本到展示框(展示聊天消息)中
+        :param text: 文本
+        :return:
+        """
         self.textedit_chat_message.append(text)
 
     def _setup_ui(self):
         # start ************* 控件 *************
         # QTextEdit: 聊天消息
         self.textedit_chat_message = QTextEdit()
+        self.textedit_chat_message.setObjectName("chat")
+        self.textedit_chat_message.setProperty("tp", "show")
+        # QTextEdit: 聊天输入框
+        self.textedit_send_message = SendTextEdit(self.signals_window, self._signals)
+        self.textedit_send_message.setMaximumHeight(75)
+        self.textedit_send_message.setObjectName("chat")
+        self.textedit_send_message.setProperty("tp", "send")
         # end *************** 控件 *************
 
         # start ************* 添加控件到布局 *************
         self.addWidget(self.textedit_chat_message, 0, 0)
+        self.addWidget(self.textedit_send_message, 1, 0)
         # end *************** 添加控件到布局 *************
 
 
@@ -467,6 +656,9 @@ class Window(QWidget):
         # 窗口大小显示 (测试用)
         self.label_window_size = QLabel(self)
         self.label_window_size.resize(250, 30)
+        if not DEBUG.de["show_window_size"]:
+            self.label_window_size.hide()
+        self.move_to_centre()
 
     def warning(self, a):
         """
@@ -510,10 +702,24 @@ class Window(QWidget):
             current_layout.itemAt(i).widget().deleteLater()
         # * #  * #  * #  * #  * #  * #  * #  * #  * #  * #  * #
         chat_layout = ChatLayout(self._signals, connection, first_msg)
-        # * #  * #  * #  * #  * #  * #  * #  * #  * #  * #  * #
+
         # 设置chatlayout为新布局(将setLayout绑定到destroyed的信号上,delete_later不会立刻将布局删除)
-        current_layout.destroyed.connect(lambda: self.setLayout(chat_layout))
+        def temp():
+            # self.resize(Window.WIDTH + 100, Window.HEIGHT + 100)
+            self.setLayout(chat_layout)
+            # self.move_to_centre()
+
+        current_layout.destroyed.connect(temp)
         current_layout.deleteLater()
+
+    def move_to_centre(self):
+        """
+        将窗口移动到屏幕中间
+        :return:
+        """
+        screen = QDesktopWidget().screenGeometry()
+        size = self.geometry()
+        self.move((screen.width() - size.width()) // 2, (screen.height() - size.height()) // 2)
 
     def setup_ui(self):
         with open("style.qss", "r") as f:

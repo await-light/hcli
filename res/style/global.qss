@@ -1,0 +1,5 @@
+QWidget {
+    background-color: "#20201d";
+    color: "#a6a28c";
+    border-color: rgba(125, 122, 104, 0.5);
+}

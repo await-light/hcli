@@ -1,14 +1,13 @@
-# TODO 外部 区分普通文本和富文本
-# TODO 外部 转义字符无法转义
-# TODO 外部 完善消息类别判定
 # TODO 外部 设置显示消息文本框内容不可编辑
 # TODO 内部 将一些常量添加到common.py
 # TODO 外部 添加不同颜色主题(包括字体选择,字体粗细,字体大小)
 # TODO 外部 支持markdown
 # TODO 外部 添加设置页面入口
+# TODO 内部 判断temp文件夹是否存在
 
 
 import sys
+import html
 import json
 import time
 import queue
@@ -19,9 +18,8 @@ from websocket import (create_connection,
                        WebSocketConnectionClosedException)
 
 import common
-from common import Label
 import debug_special
-from captcha import string2png
+from common import string2png, Label, COLORS
 
 
 class DEBUG:
@@ -32,7 +30,7 @@ class DEBUG:
     """
     de = {
         "show_window_size": False,  # 显示窗口大小在左上角
-        "turn_to_chat_in_any_situation": False,  # 除去网络部分,直接登录
+        "turn_to_chat_in_any_situation": True,  # 除去网络部分,直接登录
         "print_all_received_data": True,  # 输出所有接收到的消息
         "print_if_login_layout_widgets_destroyed": True  # 输出loginlayout(包括loginlayout)中的控件是否被销毁
     }
@@ -425,54 +423,67 @@ class QtDataHandler(QThread):
         if cmd == "onlineSet":
             nicks = message["nicks"]
             # users = message["users"]]
-            final_text += Label.font("%s Users online: %s" % (Label.b("*"), ", ".join(nicks)), color="#2e541a")
+            final_text += Label.font("%s Users online: %s" % (Label.b("*"), ", ".join(nicks)), color=COLORS["INFO"])
 
         elif cmd == "chat":  # 聊天消息
             nick = message["nick"]
-            text = message["text"].replace("\n", "<br>")
+            text = html.escape(message["text"]).replace(html.escape("\n"), Label.br)
             trip = message.get("trip")
             color = message.get("color")
             if trip is not None:
-                final_text += Label.font(trip, color="#6e6b5e")
+                final_text += Label.font(trip, color=COLORS["TRIP"])
                 final_text += " "
-            trip_nick = nick
             if color is not None:
-                trip_nick = Label.font(nick, color="#%s" % color)
-            final_text += Label.b(trip_nick)
+                color = "#" + color
+            else:  # 设置名称默认颜色
+                color = COLORS["NICK"]
+            nick = Label.font(nick, color=color)
+            final_text += Label.b(nick)
             final_text += Label.br + text
 
         elif cmd == "onlineAdd":
             nick = message["nick"]
             trip = message.get("trip")
-            final_text += Label.font("%s %s joined" % (Label.b("*"), nick), color="#2e541a")
+            final_text += Label.font("%s %s joined" % (Label.b("*"), nick), color=COLORS["INFO"])
 
         elif cmd == "onlineRemove":
             nick = message["nick"]
             trip = message.get("trip")
-            final_text += Label.font("%s %s left" % (Label.b("*"), nick), color="#2e541a")
+            final_text += Label.font("%s %s left" % (Label.b("*"), nick), color=COLORS["INFO"])
 
         elif cmd == "warn":
-            text = message["text"].replace("\n", "<br>")
-            final_text += Label.font("%s %s" % (Label.b("!"), text), color="#cfb017")
+            text = html.escape(message["text"]).replace(html.escape("\n"), Label.br)
+            final_text += Label.font("%s %s" % (Label.b("!"), text), color=COLORS["WARN"])
+
+        elif cmd == "emote":
+            text = message["text"]
+            final_text += Label.b("*")
+            final_text += " "
+            final_text += text[1:]
+            final_text = Label.font(final_text, color=COLORS["INFO"])
 
         elif cmd == "info":
             tp = message.get("type")
+            # 系统消息
             if tp is None:
-                text = message["text"].replace("\n", "<br>")
-                final_text += Label.font("%s %s" % (Label.b("*"), text), color="#2e541a")
+                text = html.escape(message["text"]).replace(html.escape("\n"), Label.br)
+                final_text += Label.font("%s %s" % (Label.b("*"), text), color=COLORS["INFO"])
+            # 私聊消息
             elif tp == "whisper":
-                text = message["text"].replace("\n", "<br>")
+                text = html.escape(message["text"]).replace(html.escape("\n"), Label.br)
                 from_ = message["from"]
-                final_text += Label.b(Label.font("(whisper)", color="#2e541a"))
+                final_text += Label.font(Label.b("*"), color=COLORS["INFO"])
                 final_text += " "
                 if type(from_) == str:  # 别人发的
                     trip = message.get("trip")
                     if trip is not None:  # 有识别码
-                        final_text += Label.font(trip, color="#6e6b5e")
+                        final_text += Label.font(trip, color=COLORS["TRIP"])
+                    else:
+                        final_text += Label.font("self", color=COLORS["TRIP"])
                 else:  # 自己发的
                     pass
-                final_text += Label.br
-                final_text += text
+                final_text += " "
+                final_text += Label.font(text, color=COLORS["INFO"])
             else:
                 return None
 
@@ -729,8 +740,10 @@ class Window(QWidget):
         self.move((screen.width() - size.width()) // 2, (screen.height() - size.height()) // 2)
 
     def setup_ui(self):
-        with open("style.qss", "r") as f:
+        with open("res/style/global.qss", "r", encoding="utf-8") as f:
             qApp.setStyleSheet(f.read())  # 全局样式
+        with open("res/style/other.qss", "r", encoding="utf-8") as f:
+            qApp.setStyleSheet(qApp.styleSheet() + f.read())
         qApp.setFont(QFont("Courier New"))  # 所有字体设为Courier New
         self._signals["signal_turn_to_layout_login"].emit()
 

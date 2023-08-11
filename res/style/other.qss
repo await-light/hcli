@@ -1,36 +1,28 @@
 /* 登录页面Logo样式 */
 QLabel#logo[position="login"] {
+    /* 字体大小 */
     font-size: 54px;
+    /* 字体宽度: 粗体 */
     font-weight: bold;
 }
 
 /* 登录页面LineEdit, QComboBox */
 QLineEdit,QComboBox#login {
-    border: 1px solid gray;
+    /* 边框角圆滑程度 */
     border-radius: 2px;
+    /* 左边边框距离文字 */
     padding-left: 3px;
+    /* 右边边框距离文字 */
     padding-right: 3px;
-    /* font-size: 16px; */
 }
 
 /* 登录页面QComboBox下拉箭头框 */
 QComboBox::drop-down#login {
     padding-right: 3px;
-    border: none;
 }
 
-/* 登录页面QComboBox下拉箭头 */
-QComboBox::down-arrow#login {
-    image: url(./res/downarrow.png);
-    width: 20px;
-}
-
-/* 聊天页面展示消息QTextEdit */
+/* 聊天页面显示消息QTextEdit */
 QTextEdit#chat[tp="show"] {
-    font-size: 18px;
-}
-
-/* 聊天页面发送消息QTextEdit */
-QTextEdit#chat[tp="send"] {
+    padding: 10px 10px 10px 10px;
     font-size: 18px;
 }

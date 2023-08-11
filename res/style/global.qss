@@ -1,5 +1,26 @@
-QWidget {
+* {
+    /* 全局字体 */
+    font-family: "Courier New";
+    /* 字体大小 */
+    font-size: 19px;
+    /* 背景颜色 */
     background-color: "#20201d";
+    /* 字体颜色 */
     color: "#a6a28c";
-    border-color: rgba(125, 122, 104, 0.5);
+}
+
+QTextEdit, QLineEdit, QComboBox, QPushButton {
+    /* 边框 */
+    border: 1px solid #7d7a68;
+}
+
+/* 滚动条整个区域样式 */
+QScrollBar:vertical {
+    width: 20px;
+    border: 1px solid #7d7a68;
+}
+
+/* 滚动条上面和下面区域样式 */
+QScrollBar::add-page:vertical,QScrollBar::sub-page:vertical{
+    border: 1px solid #7d7a68;
 }

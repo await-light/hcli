@@ -4,16 +4,16 @@ from PIL import Image, ImageDraw
 
 CHANNELS = [
     (None, ""),
-    ("./res/hackchaticon.png", "your-channel"),
-    ("./res/hackchaticon.png", "lounge"),
-    ("./res/hackchaticon.png", "meta"),
-    ("./res/hackchaticon.png", "math"),
-    ("./res/hackchaticon.png", "physics"),
-    ("./res/hackchaticon.png", "chemistry"),
-    ("./res/hackchaticon.png", "technology"),
-    ("./res/hackchaticon.png", "programming"),
-    ("./res/hackchaticon.png", "games"),
-    ("./res/hackchaticon.png", "banana")
+    ("./res/img/hackchaticon.png", "your-channel"),
+    ("./res/img/hackchaticon.png", "lounge"),
+    ("./res/img/hackchaticon.png", "meta"),
+    ("./res/img/hackchaticon.png", "math"),
+    ("./res/img/hackchaticon.png", "physics"),
+    ("./res/img/hackchaticon.png", "chemistry"),
+    ("./res/img/hackchaticon.png", "technology"),
+    ("./res/img/hackchaticon.png", "programming"),
+    ("./res/img/hackchaticon.png", "games"),
+    ("./res/img/hackchaticon.png", "banana")
 ]
 
 COLORS = {

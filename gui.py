@@ -1,16 +1,14 @@
-# TODO 外部 设置显示消息文本框内容不可编辑
-# TODO 内部 将一些常量添加到common.py
+# TODO 内部 判断temp文件夹是否存在
 # TODO 外部 添加不同颜色主题(包括字体选择,字体粗细,字体大小)
 # TODO 外部 支持markdown
 # TODO 外部 添加设置页面入口
-# TODO 内部 判断temp文件夹是否存在
 
 
 import sys
 import html
 import json
 import time
-import queue
+import os.path
 
 from PyQt5.Qt import *
 from websocket import (create_connection,
@@ -30,7 +28,7 @@ class DEBUG:
     """
     de = {
         "show_window_size": False,  # 显示窗口大小在左上角
-        "turn_to_chat_in_any_situation": True,  # 除去网络部分,直接登录
+        "turn_to_chat_in_any_situation": False,  # 除去网络部分,直接登录
         "print_all_received_data": True,  # 输出所有接收到的消息
         "print_if_login_layout_widgets_destroyed": True  # 输出loginlayout(包括loginlayout)中的控件是否被销毁
     }
@@ -165,6 +163,8 @@ class QtHackchatPort(QThread):
                 # start *************验证码转图片********************************************************
                 captcha_content = self._recv_data()
                 es = 1
+                if not os.path.exists("./res/temp"):
+                    os.mkdir("./res/temp")
                 fpa = ".\\res\\temp\\x%d_%d_%s_%s.png" % (es, time.time(), self.channel, self.nick)
                 string2png(captcha_content["text"], fpa, eachsize=es)
                 # end ***************验证码转图片********************************************************
@@ -629,6 +629,7 @@ class ChatLayout(QGridLayout):
         # start ************* 控件 *************
         # QTextEdit: 聊天消息
         self.textedit_chat_message = QTextEdit()
+        self.textedit_chat_message.setReadOnly(True)
         self.textedit_chat_message.setObjectName("chat")
         self.textedit_chat_message.setProperty("tp", "show")
         # QTextEdit: 聊天输入框
@@ -668,7 +669,7 @@ class Window(QWidget):
             "signal_turn_to_layout_chat": self.signal_turn_to_layout_chat
         }
 
-        self.setWindowTitle("hcclient(test)")
+        self.setWindowTitle("hcli")
         self.resize(*self.SIZE)
         self.setup_ui()
         # 窗口大小显示 (测试用)
@@ -744,7 +745,6 @@ class Window(QWidget):
             qApp.setStyleSheet(f.read())  # 全局样式
         with open("res/style/other.qss", "r", encoding="utf-8") as f:
             qApp.setStyleSheet(qApp.styleSheet() + f.read())
-        qApp.setFont(QFont("Courier New"))  # 所有字体设为Courier New
         self._signals["signal_turn_to_layout_login"].emit()
 
 
